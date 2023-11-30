@@ -11,7 +11,6 @@ import android.net.Uri
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
-import android.widget.SeekBar
 import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 
@@ -20,7 +19,6 @@ class MusicService: Service() {
     private val binder = MusicBinder()
     private var trackList = listOf(R.raw.music1, R.raw.music2)
     private var currentTrackIndex = 0
-    private lateinit var seekBar: SeekBar
 
     inner class MusicBinder : Binder() {
         fun getService(): MusicService = this@MusicService
@@ -43,7 +41,13 @@ class MusicService: Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             "PREVIOUS" -> playPreviousTrack()
-            "PLAY_PAUSE" -> play()
+            "PLAY_PAUSE" -> {
+                if (mediaPlayer.isPlaying) {
+                    pause()
+                } else {
+                    play()
+                }
+            }
             "NEXT" -> playNextTrack()
         }
         updateNotification()
@@ -59,6 +63,25 @@ class MusicService: Service() {
                 ""
             }
 
+        val playIntent = Intent(this, MusicService::class.java).apply {
+            action = "PLAY_PAUSE"
+        }
+
+        val playPendingIntent =
+            PendingIntent.getService(this,0, playIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+
+        val previousIntent = Intent(this, MusicService::class.java).apply {
+            action = "PREVIOUS"
+        }
+        val previousPendingIntent =
+            PendingIntent.getService(this, 0, previousIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+
+        val nextIntent = Intent(this, MusicService::class.java).apply {
+            action = "NEXT"
+        }
+        val nextPendingIntent =
+            PendingIntent.getService(this, 0, nextIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+
         val pendingIntent = PendingIntent.getActivity(
             this,
             0,
@@ -72,9 +95,9 @@ class MusicService: Service() {
             .setContentText("Calvin Harris feat. Florence Welch - Sweet Nothing")
             .setContentIntent(pendingIntent)
             .setOngoing(true)
-            .addAction(R.drawable.baseline_arrow_back_ios_24, "Пред.", null)
-            .addAction(R.drawable.baseline_pause_24, "Пауза", null)
-            .addAction(R.drawable.baseline_arrow_forward_ios_24, "След.", null)
+            .addAction(R.drawable.baseline_arrow_back_ios_24, "Пред.", previousPendingIntent)
+            .addAction(R.drawable.baseline_play_arrow_24, "Воспр.", playPendingIntent)
+            .addAction(R.drawable.baseline_arrow_forward_ios_24, "След.", nextPendingIntent)
 
         return notificationBuilder.build()
     }
@@ -97,7 +120,6 @@ class MusicService: Service() {
         currentTrackIndex = (currentTrackIndex + 1) % trackList.size
         mediaPlayer.release()
         mediaPlayer = MediaPlayer.create(this, trackList[currentTrackIndex])
-        //seekBar.max = mediaPlayer.duration
         play()
     }
 
@@ -111,13 +133,9 @@ class MusicService: Service() {
         mediaPlayer.setDataSource(applicationContext, Uri.parse("android.resource://${packageName}/${trackList[currentTrackIndex]}"))
         mediaPlayer.prepare()
         mediaPlayer.start()
-        //seekBar.max = mediaPlayer.duration
         updateNotification()
     }
 
-    fun seekTo(position: Int) {
-        mediaPlayer.seekTo(position)
-    }
 
     private fun updateNotification() {
         val notification = createNotification()
