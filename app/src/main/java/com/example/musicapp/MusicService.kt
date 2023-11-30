@@ -11,16 +11,16 @@ import android.net.Uri
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
+import android.widget.SeekBar
 import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 
 class MusicService: Service() {
-
     private lateinit var mediaPlayer: MediaPlayer
     private val binder = MusicBinder()
-    private var trackList: List<Int> = listOf(R.raw.music1, R.raw.music2)
+    private var trackList = listOf(R.raw.music1, R.raw.music2)
     private var currentTrackIndex = 0
-
+    private lateinit var seekBar: SeekBar
 
     inner class MusicBinder : Binder() {
         fun getService(): MusicService = this@MusicService
@@ -43,7 +43,7 @@ class MusicService: Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             "PREVIOUS" -> playPreviousTrack()
-            "PLAY_PAUSE" -> togglePlayPause()
+            "PLAY_PAUSE" -> play()
             "NEXT" -> playNextTrack()
         }
         updateNotification()
@@ -93,20 +93,15 @@ class MusicService: Service() {
         return channelId
     }
 
-    private fun playNextTrack() {
-        if (currentTrackIndex < trackList.size - 1) {
-            currentTrackIndex++
-        } else {
-            currentTrackIndex = 0
-        }
-        mediaPlayer.reset()
-        mediaPlayer.setDataSource(applicationContext, Uri.parse("android.resource://${packageName}/${trackList[currentTrackIndex]}"))
-        mediaPlayer.prepare()
-        mediaPlayer.start()
-        updateNotification()
+    fun playNextTrack() {
+        currentTrackIndex = (currentTrackIndex + 1) % trackList.size
+        mediaPlayer.release()
+        mediaPlayer = MediaPlayer.create(this, trackList[currentTrackIndex])
+        //seekBar.max = mediaPlayer.duration
+        play()
     }
 
-    private fun playPreviousTrack() {
+    fun playPreviousTrack() {
         if (currentTrackIndex > 0) {
             currentTrackIndex--
         } else {
@@ -116,15 +111,8 @@ class MusicService: Service() {
         mediaPlayer.setDataSource(applicationContext, Uri.parse("android.resource://${packageName}/${trackList[currentTrackIndex]}"))
         mediaPlayer.prepare()
         mediaPlayer.start()
+        //seekBar.max = mediaPlayer.duration
         updateNotification()
-    }
-
-    private fun togglePlayPause() {
-        if (mediaPlayer.isPlaying) {
-            pause()
-        } else {
-            play()
-        }
     }
 
     fun seekTo(position: Int) {
